@@ -4,7 +4,7 @@ import { getById } from "../videos";
 import { requireServiceToken } from "../service-auth";
 
 export const publishRouter = Router();
-publishRouter.use(requireServiceToken);
+publishRouter.use("/api/publish", requireServiceToken);
 
 // Polled by the Claude scheduled publish task (hourly + on manual request).
 // Returns queued videos that are due: no postponed_until in the future,
