@@ -37,6 +37,20 @@ videosRouter.post("/api/videos/:id/approve", (req, res) => {
   res.json({ ok: true });
 });
 
+// Send a queued video back to pending review (e.g. approved by mistake).
+videosRouter.post("/api/videos/:id/return-to-review", (req, res) => {
+  const id = Number(req.params.id);
+  const video = getById(id);
+  if (!video) {
+    res.status(404).json({ error: "not found" });
+    return;
+  }
+  db.prepare(
+    `UPDATE videos SET status = 'pending_review', queue_position = NULL, scheduled_time = NULL, postponed_until = NULL, updated_at = datetime('now') WHERE id = ?`
+  ).run(id);
+  res.json({ ok: true });
+});
+
 // Reject: deletes the file and the DB row entirely.
 videosRouter.post("/api/videos/:id/reject", (req, res) => {
   const id = Number(req.params.id);

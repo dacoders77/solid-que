@@ -7,6 +7,11 @@ fs.mkdirSync(path.dirname(config.dbPath), { recursive: true });
 
 export const db = new DatabaseSync(config.dbPath);
 
+// WAL + FULL sync: each commit is durably on disk before the response
+// returns, so an abrupt process kill can't lose an already-acknowledged write.
+db.exec(`PRAGMA journal_mode = WAL;`);
+db.exec(`PRAGMA synchronous = FULL;`);
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS videos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

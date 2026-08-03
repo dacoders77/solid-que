@@ -27,6 +27,7 @@ function pendingCard(video) {
     <video src="${video.video_url}" controls preload="metadata"></video>
     <div class="card-body">
       <span class="status-badge">${video.status}</span>
+      <div class="card-id">#${video.id}</div>
       <div class="card-title">${escapeHtml(video.title)}</div>
       <div class="card-desc">${escapeHtml(video.description)}</div>
       <div class="card-actions">
@@ -59,6 +60,7 @@ function queueCard(video, index, total) {
     <video src="${video.video_url}" controls preload="metadata"></video>
     <div class="card-body">
       <span class="status-badge">${video.status}</span>
+      <div class="card-id">#${video.id}</div>
       <div class="card-title">${escapeHtml(video.title)}</div>
       <div class="card-desc">${escapeHtml(video.description)}</div>
       ${linkRow ? `<div class="links">${linkRow}</div>` : ""}
@@ -66,10 +68,15 @@ function queueCard(video, index, total) {
         <button data-action="up" ${index === 0 ? "disabled" : ""}>▲ Up</button>
         <button data-action="down" ${index === total - 1 ? "disabled" : ""}>▼ Down</button>
         <button data-action="postpone">Postpone</button>
+        <button data-action="unqueue">Return to review</button>
         <button data-action="reject">Remove</button>
       </div>
     </div>
   `;
+  el.querySelector('[data-action="unqueue"]').addEventListener("click", async () => {
+    await api(`/api/videos/${video.id}/return-to-review`, { method: "POST" });
+    loadAll();
+  });
   el.querySelector('[data-action="up"]').addEventListener("click", async () => {
     await api(`/api/videos/${video.id}/move`, { method: "POST", body: JSON.stringify({ direction: "up" }) });
     loadAll();

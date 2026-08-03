@@ -8,6 +8,7 @@ import { authRouter } from "./routes/auth";
 import { ingestRouter } from "./routes/ingest";
 import { videosRouter } from "./routes/videos";
 import { publishRouter } from "./routes/publish";
+import { db } from "./db";
 
 const app = express();
 
@@ -41,6 +42,17 @@ app.use(videosRouter);
 app.use("/storage", express.static(config.storageDir));
 app.use(express.static(path.join(__dirname, "..", "public")));
 
-app.listen(config.port, () => {
+const server = app.listen(config.port, () => {
   console.log(`solid-que listening on port ${config.port}`);
 });
+
+function shutdown() {
+  console.log("shutting down, closing db...");
+  server.close(() => {
+    db.close();
+    process.exit(0);
+  });
+}
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
