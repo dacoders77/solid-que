@@ -1,7 +1,9 @@
 import { Router } from "express";
 import fs from "node:fs";
-import { db } from "../db";
-import { getById, listByStatus, listQueue, nextQueuePosition, serialize } from "../videos";
+import { db, VideoRow } from "../db";
+import { getById, listByStatus, listQueue, serialize } from "../videos";
+import { nextAvailableSlot, dateKeyLocal, slotDateTime } from "../schedule";
+import { DAILY_SLOTS } from "../config";
 
 export const videosRouter = Router();
 
@@ -13,6 +15,27 @@ videosRouter.get("/api/queue", (_req, res) => {
   res.json(listQueue());
 });
 
+// Calendar grid for the schedule table: one entry per day, each with the
+// 3 daily slots and whichever queued video (if any) occupies it.
+videosRouter.get("/api/schedule", (req, res) => {
+  const days = Math.min(60, Math.max(1, Number(req.query.days) || 14));
+  const queue = listQueue();
+  const byTime = new Map(queue.map((v) => [v.scheduled_time, v]));
+
+  const today = new Date();
+  const grid = [];
+  for (let i = 0; i < days; i++) {
+    const day = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i);
+    const dateKey = dateKeyLocal(day);
+    const slots = DAILY_SLOTS.map((slot) => {
+      const datetime = slotDateTime(dateKey, slot);
+      return { slot, datetime, video: byTime.get(datetime) ?? null };
+    });
+    grid.push({ date: dateKey, slots });
+  }
+  res.json(grid);
+});
+
 videosRouter.get("/api/videos/:id", (req, res) => {
   const video = getById(Number(req.params.id));
   if (!video) {
@@ -22,7 +45,8 @@ videosRouter.get("/api/videos/:id", (req, res) => {
   res.json(serialize(video));
 });
 
-// Approve: moves a pending_review video into the queue at the end.
+// Approve: moves a pending_review video into the queue, auto-assigned to
+// the next open daily slot (10:00/10:15/10:30, overflowing to next day).
 videosRouter.post("/api/videos/:id/approve", (req, res) => {
   const id = Number(req.params.id);
   const video = getById(id);
@@ -30,11 +54,11 @@ videosRouter.post("/api/videos/:id/approve", (req, res) => {
     res.status(404).json({ error: "not found" });
     return;
   }
-  const position = nextQueuePosition();
+  const scheduledTime = nextAvailableSlot();
   db.prepare(
-    `UPDATE videos SET status = 'queued', queue_position = ?, updated_at = datetime('now') WHERE id = ?`
-  ).run(position, id);
-  res.json({ ok: true });
+    `UPDATE videos SET status = 'queued', scheduled_time = ?, updated_at = datetime('now') WHERE id = ?`
+  ).run(scheduledTime, id);
+  res.json({ ok: true, scheduled_time: scheduledTime });
 });
 
 // Send a queued video back to pending review (e.g. approved by mistake).
@@ -84,46 +108,9 @@ videosRouter.post("/api/videos/:id/postpone", (req, res) => {
   res.json({ ok: true });
 });
 
-// Reorder: move a queued video up or down one position (swap with neighbor).
-videosRouter.post("/api/videos/:id/move", (req, res) => {
-  const id = Number(req.params.id);
-  const { direction } = req.body ?? {};
-  if (direction !== "up" && direction !== "down") {
-    res.status(400).json({ error: "direction must be 'up' or 'down'" });
-    return;
-  }
-
-  const queue = listQueue();
-  const index = queue.findIndex((v) => v.id === id);
-  if (index === -1) {
-    res.status(404).json({ error: "not found in queue" });
-    return;
-  }
-
-  const swapIndex = direction === "up" ? index - 1 : index + 1;
-  if (swapIndex < 0 || swapIndex >= queue.length) {
-    res.json({ ok: true }); // already at the edge, no-op
-    return;
-  }
-
-  const current = queue[index];
-  const neighbor = queue[swapIndex];
-  const currentPos = current.queue_position;
-  const neighborPos = neighbor.queue_position;
-
-  db.prepare(`UPDATE videos SET queue_position = ?, updated_at = datetime('now') WHERE id = ?`).run(
-    neighborPos,
-    current.id
-  );
-  db.prepare(`UPDATE videos SET queue_position = ?, updated_at = datetime('now') WHERE id = ?`).run(
-    currentPos,
-    neighbor.id
-  );
-
-  res.json({ ok: true });
-});
-
-// Set an explicit scheduled publish time for a queued video.
+// Set an explicit scheduled publish time for a queued video (used by the
+// calendar drag-and-drop). If the target slot is already taken by another
+// queued video, the two swap slots instead of colliding.
 videosRouter.post("/api/videos/:id/schedule", (req, res) => {
   const id = Number(req.params.id);
   const { scheduled_time } = req.body ?? {};
@@ -132,8 +119,26 @@ videosRouter.post("/api/videos/:id/schedule", (req, res) => {
     res.status(404).json({ error: "not found" });
     return;
   }
+  if (typeof scheduled_time !== "string") {
+    res.status(400).json({ error: "scheduled_time must be an ISO date string" });
+    return;
+  }
+
+  const occupant = db
+    .prepare(
+      `SELECT * FROM videos WHERE status = 'queued' AND scheduled_time = ? AND id != ?`
+    )
+    .get(scheduled_time, id) as VideoRow | undefined;
+
+  if (occupant) {
+    db.prepare(
+      `UPDATE videos SET scheduled_time = ?, updated_at = datetime('now') WHERE id = ?`
+    ).run(video.scheduled_time, occupant.id);
+  }
+
   db.prepare(
     `UPDATE videos SET scheduled_time = ?, updated_at = datetime('now') WHERE id = ?`
-  ).run(typeof scheduled_time === "string" ? scheduled_time : null, id);
+  ).run(scheduled_time, id);
+
   res.json({ ok: true });
 });

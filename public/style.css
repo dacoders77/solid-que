@@ -96,3 +96,76 @@ section h2 {
 }
 
 .empty { color: var(--muted); font-size: 13px; }
+
+.schedule-wrap { overflow-x: auto; }
+
+.schedule-table { border-collapse: collapse; width: max-content; min-width: 100%; }
+
+.schedule-table th, .schedule-table td {
+  border: 1px solid var(--border);
+  padding: 6px;
+  vertical-align: top;
+}
+
+.schedule-table th {
+  background: var(--panel);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: center;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+}
+
+.slot-label {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  text-align: right;
+  padding-right: 10px !important;
+}
+
+.schedule-cell {
+  width: 130px;
+  min-width: 130px;
+  height: 190px;
+}
+
+.schedule-cell.drag-over { background: #251313; }
+
+.slot-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  cursor: grab;
+}
+
+.slot-card video {
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  object-fit: cover;
+  background: #000;
+  pointer-events: none;
+}
+
+.slot-card-body { padding: 6px; font-size: 11px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.slot-card-id { color: var(--muted); font-family: monospace; }
+.slot-card-title { font-weight: 600; line-height: 1.2; }
+.slot-card-actions { margin-top: auto; display: flex; gap: 4px; }
+.slot-card-actions button { padding: 2px 6px; font-size: 10px; }
+
+.slot-empty {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 11px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}

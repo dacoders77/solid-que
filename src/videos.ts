@@ -28,7 +28,7 @@ export function listByStatus(status: string): VideoRowWithUrls[] {
 export function listQueue(): VideoRowWithUrls[] {
   const rows = db
     .prepare(
-      `SELECT * FROM videos WHERE status = 'queued' ORDER BY queue_position ASC, created_at ASC`
+      `SELECT * FROM videos WHERE status = 'queued' ORDER BY scheduled_time ASC, created_at ASC`
     )
     .all() as unknown as VideoRow[];
   return rows.map(serialize);
@@ -38,15 +38,4 @@ export function getById(id: number): VideoRow | undefined {
   return db.prepare(`SELECT * FROM videos WHERE id = ?`).get(id) as
     | VideoRow
     | undefined;
-}
-
-export function nextQueuePosition(): number {
-  const row = db
-    .prepare(`SELECT MAX(queue_position) as maxPos FROM videos WHERE status = 'queued'`)
-    .get() as { maxPos: number | null };
-  return (row.maxPos ?? 0) + 1;
-}
-
-export function touch(id: number) {
-  db.prepare(`UPDATE videos SET updated_at = datetime('now') WHERE id = ?`).run(id);
 }

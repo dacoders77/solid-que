@@ -48,66 +48,115 @@ function pendingCard(video) {
   return el;
 }
 
-function queueCard(video, index, total) {
-  const el = document.createElement("div");
-  el.className = "card";
-  const linkRow = ["youtube_link", "instagram_link", "facebook_link", "tiktok_link"]
-    .filter((k) => video[k])
-    .map((k) => `<a href="${video[k]}" target="_blank">${k.replace("_link", "")}</a>`)
-    .join("");
+function formatDateHeader(dateKey) {
+  const [y, m, d] = dateKey.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  return date.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+}
 
+function slotCard(video) {
+  const el = document.createElement("div");
+  el.className = "slot-card";
+  el.draggable = true;
   el.innerHTML = `
-    <video src="${video.video_url}" controls preload="metadata"></video>
-    <div class="card-body">
-      <span class="status-badge">${video.status}</span>
-      <div class="card-id">#${video.id}</div>
-      <div class="card-title">${escapeHtml(video.title)}</div>
-      <div class="card-desc">${escapeHtml(video.description)}</div>
-      ${linkRow ? `<div class="links">${linkRow}</div>` : ""}
-      <div class="card-actions">
-        <button data-action="up" ${index === 0 ? "disabled" : ""}>▲ Up</button>
-        <button data-action="down" ${index === total - 1 ? "disabled" : ""}>▼ Down</button>
-        <button data-action="postpone">Postpone</button>
-        <button data-action="unqueue">Return to review</button>
-        <button data-action="reject">Remove</button>
+    <video src="${video.video_url}" muted preload="metadata"></video>
+    <div class="slot-card-body">
+      <div class="slot-card-id">#${video.id}</div>
+      <div class="slot-card-title">${escapeHtml(video.title)}</div>
+      <div class="slot-card-actions">
+        <button data-action="unqueue" title="Return to review">↩</button>
+        <button data-action="reject" title="Remove">✕</button>
       </div>
     </div>
   `;
-  el.querySelector('[data-action="unqueue"]').addEventListener("click", async () => {
+  el.addEventListener("dragstart", (e) => {
+    e.dataTransfer.setData("text/plain", String(video.id));
+    e.dataTransfer.effectAllowed = "move";
+  });
+  el.querySelector('[data-action="unqueue"]').addEventListener("click", async (e) => {
+    e.stopPropagation();
     await api(`/api/videos/${video.id}/return-to-review`, { method: "POST" });
     loadAll();
   });
-  el.querySelector('[data-action="up"]').addEventListener("click", async () => {
-    await api(`/api/videos/${video.id}/move`, { method: "POST", body: JSON.stringify({ direction: "up" }) });
-    loadAll();
-  });
-  el.querySelector('[data-action="down"]').addEventListener("click", async () => {
-    await api(`/api/videos/${video.id}/move`, { method: "POST", body: JSON.stringify({ direction: "down" }) });
-    loadAll();
-  });
-  el.querySelector('[data-action="postpone"]').addEventListener("click", async () => {
-    const hours = prompt("Postpone for how many hours?", "24");
-    if (!hours) return;
-    const until = new Date(Date.now() + Number(hours) * 3600 * 1000).toISOString();
-    await api(`/api/videos/${video.id}/postpone`, { method: "POST", body: JSON.stringify({ until }) });
-    loadAll();
-  });
-  el.querySelector('[data-action="reject"]').addEventListener("click", async () => {
-    if (!confirm(`Remove "${video.title}" from the queue and delete the file?`)) return;
+  el.querySelector('[data-action="reject"]').addEventListener("click", async (e) => {
+    e.stopPropagation();
+    if (!confirm(`Remove "${video.title}" from the schedule and delete the file?`)) return;
     await api(`/api/videos/${video.id}/reject`, { method: "POST" });
     loadAll();
   });
   return el;
 }
 
+function scheduleCell(datetime) {
+  const td = document.createElement("td");
+  td.className = "schedule-cell";
+  td.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    td.classList.add("drag-over");
+  });
+  td.addEventListener("dragleave", () => td.classList.remove("drag-over"));
+  td.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    td.classList.remove("drag-over");
+    const id = e.dataTransfer.getData("text/plain");
+    if (!id) return;
+    await api(`/api/videos/${id}/schedule`, {
+      method: "POST",
+      body: JSON.stringify({ scheduled_time: datetime }),
+    });
+    loadAll();
+  });
+  return td;
+}
+
+async function renderSchedule() {
+  const container = document.getElementById("scheduleTable");
+  const grid = await api("/api/schedule?days=14");
+
+  const table = document.createElement("table");
+  table.className = "schedule-table";
+
+  const thead = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  headRow.innerHTML = "<th></th>" + grid.map((day) => `<th>${formatDateHeader(day.date)}</th>`).join("");
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  const slots = grid[0]?.slots.map((s) => s.slot) ?? [];
+  slots.forEach((slot, slotIndex) => {
+    const tr = document.createElement("tr");
+    const labelTd = document.createElement("td");
+    labelTd.className = "slot-label";
+    labelTd.textContent = slot;
+    tr.appendChild(labelTd);
+
+    grid.forEach((day) => {
+      const { datetime, video } = day.slots[slotIndex];
+      const td = scheduleCell(datetime);
+      if (video) {
+        td.appendChild(slotCard(video));
+      } else {
+        const empty = document.createElement("div");
+        empty.className = "slot-empty";
+        empty.textContent = "—";
+        td.appendChild(empty);
+      }
+      tr.appendChild(td);
+    });
+
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+
+  container.innerHTML = "";
+  container.appendChild(table);
+}
+
 async function loadAll() {
   const pendingList = document.getElementById("pendingList");
-  const queueList = document.getElementById("queueList");
 
-  const [pending, queue] = await Promise.all([
-    api("/api/videos/pending"),
-    api("/api/queue"),
-  ]);
+  const pending = await api("/api/videos/pending");
 
   pendingList.innerHTML = "";
   if (pending.length === 0) {
@@ -116,12 +165,7 @@ async function loadAll() {
     pending.forEach((v) => pendingList.appendChild(pendingCard(v)));
   }
 
-  queueList.innerHTML = "";
-  if (queue.length === 0) {
-    queueList.innerHTML = '<div class="empty">Queue is empty.</div>';
-  } else {
-    queue.forEach((v, i) => queueList.appendChild(queueCard(v, i, queue.length)));
-  }
+  await renderSchedule();
 }
 
 document.getElementById("logoutBtn").addEventListener("click", async () => {

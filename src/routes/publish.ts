@@ -1,6 +1,6 @@
 import { Router } from "express";
-import { db } from "../db";
-import { getById } from "../videos";
+import { db, VideoRow } from "../db";
+import { getById, serialize } from "../videos";
 import { requireServiceToken } from "../service-auth";
 
 export const publishRouter = Router();
@@ -9,17 +9,23 @@ publishRouter.use("/api/publish", requireServiceToken);
 // Polled by the Claude scheduled publish task (hourly + on manual request).
 // Returns queued videos that are due: no postponed_until in the future,
 // and either no scheduled_time set or scheduled_time has passed.
+//
+// scheduled_time/postponed_until are stored as JS-generated ISO UTC strings
+// (e.g. "2026-08-03T14:00:00.000Z"), which don't sort/compare correctly
+// against SQLite's own datetime('now') (a different format/timezone). So
+// "now" is computed here in JS and passed in as a parameter instead.
 publishRouter.get("/api/publish/due", (_req, res) => {
+  const nowIso = new Date().toISOString();
   const rows = db
     .prepare(
       `SELECT * FROM videos
        WHERE status = 'queued'
-         AND (postponed_until IS NULL OR postponed_until <= datetime('now'))
-         AND (scheduled_time IS NULL OR scheduled_time <= datetime('now'))
-       ORDER BY queue_position ASC, created_at ASC`
+         AND (postponed_until IS NULL OR postponed_until <= ?)
+         AND (scheduled_time IS NULL OR scheduled_time <= ?)
+       ORDER BY scheduled_time ASC, created_at ASC`
     )
-    .all();
-  res.json(rows);
+    .all(nowIso, nowIso) as unknown as VideoRow[];
+  res.json(rows.map(serialize));
 });
 
 // Marks a video as currently being published (prevents double-processing

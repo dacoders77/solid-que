@@ -19,3 +19,6 @@ export const config = {
   dbPath: path.resolve(process.env.DB_PATH ?? "./data/solid-que.db"),
   storageDir: path.resolve(process.env.STORAGE_DIR ?? "./storage"),
 };
+
+// Default Metricool posting slots per day, in local server time.
+export const DAILY_SLOTS = ["10:00", "10:15", "10:30"];
