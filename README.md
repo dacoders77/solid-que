@@ -7,6 +7,48 @@ in a browser dashboard → an hourly (or on-demand) Claude scheduled task publis
 approved queue to YouTube, Instagram, Facebook, and TikTok simultaneously via the
 Metricool MCP connector.
 
+## Background
+
+Videos are produced with a separate HyperFrames-based pipeline following the
+"Solid Plumbing & Electrical" brand instructions (brand kit, editing taste,
+delivery specs, etc. — see the `md/` docs in the parent project). Once a
+video is rendered, it needs a place to land, get a human sanity-check, and
+go out to all four platforms at once without manual re-uploading per app.
+solid-que is that piece: DB + review UI + queue + publish trigger, built as
+its own standalone app (separate repo: `dacoders77/solid-que`) so it can run
+continuously regardless of what else is happening in the video-generation
+project. It's expected to keep growing new features over time.
+
+## Design decisions (from project discussion)
+
+These came out of working through the requirements before building:
+
+- **Stack**: Node.js/TypeScript + SQLite (`node:sqlite`, no native build step)
+  — matches the JS-heavy video pipeline, and SQLite needs zero setup.
+- **Always-on hosting**: runs as a Windows service (see below) so it survives
+  reboots and doesn't need a terminal window open.
+- **Ingestion**: the render pipeline pushes directly to the DB via a local
+  API call right after rendering finishes — no folder-watching/polling.
+- **Storage**: the ingest step **moves** the rendered file into the app's own
+  managed storage folder; it never duplicates it.
+- **Review**: single-user login-gated dashboard, reachable via plain
+  port-forwarding (not just localhost) since access is needed from outside
+  the home network. No VPN/tunnel layer — just app-level login for now.
+- **Queue control**: not just FIFO — approved videos can be reordered
+  (move up/down), postponed, and given an explicit scheduled publish time.
+- **Publish mechanism**: the Node app cannot call the Metricool MCP connector
+  itself (MCP tools are only callable from a Claude session). So publishing
+  is handled by a Claude scheduled task that polls the app's API and
+  publishes via the already-configured Metricool connector — hourly, plus
+  on-demand when triggered manually from the dashboard.
+- **Per-video metadata tracked**: title, description, thumbnail, transcript,
+  source project, and one link per platform (YouTube/Instagram/Facebook/
+  TikTok) so you can jump straight to the live post after publishing.
+- **Every video publishes to all 4 platforms** at once — no per-platform
+  toggle (kept simple; can add later if needed).
+- **Git workflow**: commits and pushes for this repo are handled directly,
+  without asking for confirmation each time (per your instruction).
+
 ## Stack
 
 - Node.js + TypeScript, Express
@@ -119,4 +161,20 @@ that:
 4. Calls `POST /api/publish/:id/result` with the resulting post links (or the
    error, on failure).
 
-See `docs/publish-task.md` for the exact scheduled-task setup.
+**Not wired up yet** — this needs a public IP/port-forward address first, so
+the scheduled task can reach the app's API and Metricool can fetch the
+video/thumbnail files over the internet (localhost URLs won't work for
+Metricool's side). Postponed until that's in place.
+
+## Status
+
+Built so far: DB schema, ingest API, review/queue API + dashboard, publish
+worker API endpoints, service-token auth for machine callers, and Windows
+service deployment docs. Smoke-tested locally (login, ingest with real file
+move, approve/reorder/postpone, static file serving, auth gates).
+
+Still open:
+- Public IP / port-forward setup (blocks the Claude scheduled publish task)
+- Wiring the actual Claude scheduled task once the above is ready
+- HTTPS in front of the port-forwarded app (currently plain HTTP)
+- Windows service install on the target machine (docs are ready, not yet run)

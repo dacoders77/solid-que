@@ -5,3 +5,6 @@ data/
 storage/
 *.db
 *.db-journal
+dev-credentials.txt
+server.log
+*.log
