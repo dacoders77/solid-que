@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>solid-que — Login</title>
+<style>
+  body { font-family: system-ui, sans-serif; background: #0b0b0b; color: #f4f4f4; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+  form { background: #171717; padding: 32px; border-radius: 12px; width: 280px; display: flex; flex-direction: column; gap: 12px; }
+  h1 { font-size: 18px; margin: 0 0 8px; }
+  input { padding: 10px; border-radius: 6px; border: 1px solid #333; background: #0b0b0b; color: #fff; }
+  button { padding: 10px; border-radius: 6px; border: none; background: #F50507; color: #fff; font-weight: 600; cursor: pointer; }
+  .error { color: #F50507; font-size: 13px; min-height: 16px; }
+</style>
+</head>
+<body>
+  <form id="loginForm">
+    <h1>solid-que</h1>
+    <input type="text" name="username" placeholder="Username" autocomplete="username" required />
+    <input type="password" name="password" placeholder="Password" autocomplete="current-password" required />
+    <div class="error" id="error"></div>
+    <button type="submit">Log in</button>
+  </form>
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = new FormData(e.target);
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: form.get('username'), password: form.get('password') })
+      });
+      if (res.ok) {
+        window.location.href = '/';
+      } else {
+        document.getElementById('error').textContent = 'Invalid credentials';
+      }
+    });
+  </script>
+</body>
+</html>
