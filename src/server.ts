@@ -34,7 +34,17 @@ app.use(publishRouter);
 // silently fails to execute and every button on the page appears dead.
 // index.html is excluded here (index: false) and served explicitly below,
 // behind auth, so an unauthenticated "/" still bounces to the login page.
-app.use(express.static(path.join(__dirname, "..", "public"), { index: false }));
+//
+// no-store: this app is actively developed and redeployed often; a stale
+// cached JS/CSS file has repeatedly caused "the buttons don't work" reports
+// that were actually just an old browser cache. Never worth the tradeoff
+// here — always fetch fresh.
+app.use(
+  express.static(path.join(__dirname, "..", "public"), {
+    index: false,
+    setHeaders: (res) => res.setHeader("Cache-Control", "no-store"),
+  })
+);
 
 app.use((req, res, next) => {
   if (req.path === "/login" || req.path === "/api/login") {
@@ -45,10 +55,12 @@ app.use((req, res, next) => {
 });
 
 app.get("/", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
   res.sendFile("index.html", { root: path.join(__dirname, "..", "public") });
 });
 
 app.get("/trash", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
   res.sendFile("trash.html", { root: path.join(__dirname, "..", "public") });
 });
 
