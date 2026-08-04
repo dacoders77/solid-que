@@ -17,7 +17,6 @@ export const config = {
   // Claude publish worker) that aren't browser sessions.
   serviceToken: process.env.SERVICE_TOKEN ?? "",
   dbPath: path.resolve(process.env.DB_PATH ?? "./data/solid-que.db"),
-  storageDir: path.resolve(process.env.STORAGE_DIR ?? "./storage"),
 };
 
 // Default Metricool posting slots per day, in local server time.

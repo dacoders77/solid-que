@@ -1,20 +1,15 @@
-import path from "node:path";
 import { db, VideoRow } from "./db";
-import { config } from "./config";
 
 export type VideoRowWithUrls = VideoRow & { video_url: string; thumbnail_url: string };
 
-function toStorageUrl(absolutePath: string): string {
-  if (!absolutePath) return "";
-  const relative = path.relative(config.storageDir, absolutePath).split(path.sep).join("/");
-  return `/storage/${encodeURI(relative)}`;
-}
-
+// Files live wherever the render pipeline put them (never moved by this
+// app), so playback is served by id through a streaming route rather than
+// a static mount tied to one folder.
 export function serialize(row: VideoRow): VideoRowWithUrls {
   return {
     ...row,
-    video_url: toStorageUrl(row.video_path),
-    thumbnail_url: toStorageUrl(row.thumbnail_path),
+    video_url: `/api/videos/${row.id}/file`,
+    thumbnail_url: row.thumbnail_path ? `/api/videos/${row.id}/thumbnail` : "",
   };
 }
 

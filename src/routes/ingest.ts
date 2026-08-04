@@ -1,8 +1,6 @@
 import { Router } from "express";
 import fs from "node:fs";
-import path from "node:path";
 import { db } from "../db";
-import { config } from "../config";
 import { requireServiceToken } from "../service-auth";
 
 export const ingestRouter = Router();
@@ -10,6 +8,10 @@ export const ingestRouter = Router();
 // Called by the render pipeline (a local script, not a browser) once a video
 // is finished, so it authenticates with a shared secret header instead of a
 // session cookie.
+//
+// Files are referenced in place — never moved or copied. video_path/
+// thumbnail_path stay pointing at wherever the render pipeline put them
+// (the project's own render folder).
 ingestRouter.post("/api/videos/ingest", requireServiceToken, (req, res) => {
   const {
     title,
@@ -30,36 +32,17 @@ ingestRouter.post("/api/videos/ingest", requireServiceToken, (req, res) => {
     return;
   }
 
-  const videosDir = path.join(config.storageDir, "videos");
-  const thumbsDir = path.join(config.storageDir, "thumbnails");
-  fs.mkdirSync(videosDir, { recursive: true });
-  fs.mkdirSync(thumbsDir, { recursive: true });
-
-  const stamp = Date.now();
-  const videoExt = path.extname(video_path) || ".mp4";
-  const destVideoPath = path.join(videosDir, `${stamp}${videoExt}`);
-  fs.renameSync(video_path, destVideoPath);
-
-  let destThumbPath = "";
-  if (typeof thumbnail_path === "string" && thumbnail_path && fs.existsSync(thumbnail_path)) {
-    const thumbExt = path.extname(thumbnail_path) || ".jpg";
-    destThumbPath = path.join(thumbsDir, `${stamp}${thumbExt}`);
-    fs.renameSync(thumbnail_path, destThumbPath);
-  }
+  const thumbPath =
+    typeof thumbnail_path === "string" && thumbnail_path && fs.existsSync(thumbnail_path)
+      ? thumbnail_path
+      : "";
 
   const result = db
     .prepare(
       `INSERT INTO videos (title, description, transcript, source_project, video_path, thumbnail_path, status)
        VALUES (?, ?, ?, ?, ?, ?, 'pending_review')`
     )
-    .run(
-      title,
-      description ?? "",
-      transcript ?? "",
-      source_project ?? "",
-      destVideoPath,
-      destThumbPath
-    );
+    .run(title, description ?? "", transcript ?? "", source_project ?? "", video_path, thumbPath);
 
   res.status(201).json({ id: Number(result.lastInsertRowid) });
 });

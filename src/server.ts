@@ -54,8 +54,6 @@ app.get("/trash", (_req, res) => {
 
 app.use(videosRouter);
 
-app.use("/storage", express.static(config.storageDir));
-
 const server = app.listen(config.port, () => {
   console.log(`solid-que listening on port ${config.port}`);
 });

@@ -1,11 +1,10 @@
 import { Router } from "express";
 import fs from "node:fs";
-import path from "node:path";
 import { spawn } from "node:child_process";
 import { db, VideoRow } from "../db";
 import { getById, listByStatus, listQueue, serialize } from "../videos";
 import { nextAvailableSlot, dateKeyLocal, slotDateTime } from "../schedule";
-import { DAILY_SLOTS, config } from "../config";
+import { DAILY_SLOTS } from "../config";
 import { withUndo, undoLast, redoLast, undoRedoState } from "../actions";
 
 export const videosRouter = Router();
@@ -64,6 +63,26 @@ videosRouter.get("/api/videos/:id", (req, res) => {
   res.json(serialize(video));
 });
 
+// Streams the video/thumbnail by id, wherever the file actually lives.
+// res.sendFile supports Range requests natively, so <video> seeking works.
+videosRouter.get("/api/videos/:id/file", (req, res) => {
+  const video = getById(Number(req.params.id));
+  if (!video || !fs.existsSync(video.video_path)) {
+    res.status(404).end();
+    return;
+  }
+  res.sendFile(video.video_path);
+});
+
+videosRouter.get("/api/videos/:id/thumbnail", (req, res) => {
+  const video = getById(Number(req.params.id));
+  if (!video || !video.thumbnail_path || !fs.existsSync(video.thumbnail_path)) {
+    res.status(404).end();
+    return;
+  }
+  res.sendFile(video.thumbnail_path);
+});
+
 // Opens the video's source folder in Windows Explorer, on the machine
 // running this server. Only meaningful when the dashboard is used from the
 // same PC as the server (not over the port-forwarded remote connection).
@@ -73,13 +92,18 @@ videosRouter.post("/api/videos/:id/open-folder", (req, res) => {
     res.status(404).json({ error: "not found" });
     return;
   }
-  const folder = path.dirname(video.video_path);
-  if (!fs.existsSync(folder)) {
-    res.status(404).json({ error: `folder does not exist: ${folder}` });
+  if (!fs.existsSync(video.video_path)) {
+    res.status(404).json({ error: `file does not exist: ${video.video_path}` });
     return;
   }
-  spawn("explorer.exe", [folder], { detached: true }).unref();
-  res.json({ ok: true });
+  // /select, opens the folder AND highlights the file, which is much more
+  // obviously "something happened" than opening a bare folder window.
+  const child = spawn("explorer.exe", [`/select,${video.video_path}`], {
+    detached: true,
+    stdio: "ignore",
+  });
+  child.unref();
+  res.json({ ok: true, opened: video.video_path });
 });
 
 // Approve: moves a pending_review video into the queue, auto-assigned to
@@ -101,8 +125,8 @@ videosRouter.post("/api/videos/:id/approve", (req, res) => {
 });
 
 // Send a video back to pending review — from the queue (approved by
-// mistake) or from trash (rejected by mistake). If it's currently sitting
-// in the trash folder, the file moves back into normal managed storage.
+// mistake) or from trash (rejected by mistake). Files are never moved by
+// this app, so this is a pure status change.
 videosRouter.post("/api/videos/:id/return-to-review", (req, res) => {
   const id = Number(req.params.id);
   const video = getById(id);
@@ -111,29 +135,9 @@ videosRouter.post("/api/videos/:id/return-to-review", (req, res) => {
     return;
   }
   withUndo("return-to-review", [id], () => {
-    const videosDir = path.join(config.storageDir, "videos");
-    const thumbsDir = path.join(config.storageDir, "thumbnails");
-
-    let restoredVideoPath = video.video_path;
-    if (video.video_path.includes(`${path.sep}trash${path.sep}`) && fs.existsSync(video.video_path)) {
-      fs.mkdirSync(videosDir, { recursive: true });
-      restoredVideoPath = path.join(videosDir, path.basename(video.video_path));
-      fs.renameSync(video.video_path, restoredVideoPath);
-    }
-    let restoredThumbPath = video.thumbnail_path;
-    if (
-      video.thumbnail_path &&
-      video.thumbnail_path.includes(`${path.sep}trash${path.sep}`) &&
-      fs.existsSync(video.thumbnail_path)
-    ) {
-      fs.mkdirSync(thumbsDir, { recursive: true });
-      restoredThumbPath = path.join(thumbsDir, path.basename(video.thumbnail_path));
-      fs.renameSync(video.thumbnail_path, restoredThumbPath);
-    }
-
     db.prepare(
-      `UPDATE videos SET status = 'pending_review', video_path = ?, thumbnail_path = ?, queue_position = NULL, scheduled_time = NULL, postponed_until = NULL, updated_at = datetime('now') WHERE id = ?`
-    ).run(restoredVideoPath, restoredThumbPath, id);
+      `UPDATE videos SET status = 'pending_review', queue_position = NULL, scheduled_time = NULL, postponed_until = NULL, updated_at = datetime('now') WHERE id = ?`
+    ).run(id);
   });
   res.json({ ok: true });
 });
@@ -158,8 +162,8 @@ videosRouter.post("/api/videos/:id/delete-forever", (req, res) => {
   res.json({ ok: true });
 });
 
-// Reject: soft-deletes. The file moves into a trash folder (not permanently
-// removed) and the row is marked 'rejected', so this can be undone.
+// Reject: soft-deletes — marks the row 'rejected' (shows up in Trash) but
+// never touches the file on disk, so this is always undoable.
 videosRouter.post("/api/videos/:id/reject", (req, res) => {
   const id = Number(req.params.id);
   const video = getById(id);
@@ -169,25 +173,9 @@ videosRouter.post("/api/videos/:id/reject", (req, res) => {
   }
 
   withUndo("reject", [id], () => {
-    const trashVideosDir = path.join(config.storageDir, "trash", "videos");
-    const trashThumbsDir = path.join(config.storageDir, "trash", "thumbnails");
-    fs.mkdirSync(trashVideosDir, { recursive: true });
-    fs.mkdirSync(trashThumbsDir, { recursive: true });
-
-    let newVideoPath = video.video_path;
-    if (video.video_path && fs.existsSync(video.video_path)) {
-      newVideoPath = path.join(trashVideosDir, path.basename(video.video_path));
-      fs.renameSync(video.video_path, newVideoPath);
-    }
-    let newThumbPath = video.thumbnail_path;
-    if (video.thumbnail_path && fs.existsSync(video.thumbnail_path)) {
-      newThumbPath = path.join(trashThumbsDir, path.basename(video.thumbnail_path));
-      fs.renameSync(video.thumbnail_path, newThumbPath);
-    }
-
     db.prepare(
-      `UPDATE videos SET status = 'rejected', video_path = ?, thumbnail_path = ?, queue_position = NULL, scheduled_time = NULL, postponed_until = NULL, updated_at = datetime('now') WHERE id = ?`
-    ).run(newVideoPath, newThumbPath, id);
+      `UPDATE videos SET status = 'rejected', queue_position = NULL, scheduled_time = NULL, postponed_until = NULL, updated_at = datetime('now') WHERE id = ?`
+    ).run(id);
   });
 
   res.json({ ok: true });
