@@ -29,6 +29,13 @@ app.use(authRouter);
 app.use(ingestRouter);
 app.use(publishRouter);
 
+// Static assets (JS/CSS) carry no sensitive data and must load even when
+// the session has gone stale, otherwise a login-redirected <script src>
+// silently fails to execute and every button on the page appears dead.
+// index.html is excluded here (index: false) and served explicitly below,
+// behind auth, so an unauthenticated "/" still bounces to the login page.
+app.use(express.static(path.join(__dirname, "..", "public"), { index: false }));
+
 app.use((req, res, next) => {
   if (req.path === "/login" || req.path === "/api/login") {
     next();
@@ -37,10 +44,13 @@ app.use((req, res, next) => {
   requireAuth(req, res, next);
 });
 
+app.get("/", (_req, res) => {
+  res.sendFile("index.html", { root: path.join(__dirname, "..", "public") });
+});
+
 app.use(videosRouter);
 
 app.use("/storage", express.static(config.storageDir));
-app.use(express.static(path.join(__dirname, "..", "public")));
 
 const server = app.listen(config.port, () => {
   console.log(`solid-que listening on port ${config.port}`);
