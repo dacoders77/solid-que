@@ -40,7 +40,7 @@ function trashCard(video) {
       await api(`/api/videos/${video.id}/return-to-review`, { method: "POST" });
       loadTrash();
     } catch (err) {
-      alert(`Restore failed: ${err.message}`);
+      showToast(`Restore failed: ${err.message}`, "error");
     }
   });
   el.querySelector('[data-action="delete-forever"]').addEventListener("click", async () => {
@@ -49,7 +49,7 @@ function trashCard(video) {
       await api(`/api/videos/${video.id}/delete-forever`, { method: "POST" });
       loadTrash();
     } catch (err) {
-      alert(`Delete failed: ${err.message}`);
+      showToast(`Delete failed: ${err.message}`, "error");
     }
   });
   return el;

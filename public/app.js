@@ -60,7 +60,7 @@ function pendingCard(video) {
       await api(`/api/videos/${video.id}/approve`, { method: "POST" });
       fadeOutAndReload(el);
     } catch (err) {
-      alert(`Approve failed: ${err.message}`);
+      showToast(`Approve failed: ${err.message}`, "error");
     }
   });
   el.querySelector('[data-action="reject"]').addEventListener("click", async () => {
@@ -68,14 +68,14 @@ function pendingCard(video) {
       await api(`/api/videos/${video.id}/reject`, { method: "POST" });
       fadeOutAndReload(el);
     } catch (err) {
-      alert(`Reject failed: ${err.message}`);
+      showToast(`Reject failed: ${err.message}`, "error");
     }
   });
   el.querySelector('[data-action="open-folder"]').addEventListener("click", async () => {
     try {
       await api(`/api/videos/${video.id}/open-folder`, { method: "POST" });
     } catch (err) {
-      alert(`Couldn't open folder: ${err.message}`);
+      showToast(`Couldn't open folder: ${err.message}`, "error");
     }
   });
   // Note buttons are purely visual — no API call, nothing persisted.
@@ -119,8 +119,10 @@ function slotCard(video) {
     e.stopPropagation();
     const result = await api(`/api/videos/${video.id}/return-to-review`, { method: "POST" });
     if (result.needs_metricool_cleanup) {
-      alert(
-        `"${video.title}" was already added to the Metricool calendar. It has been unscheduled here, but you'll need to remove/cancel it in Metricool manually too — this app can't auto-cancel a Metricool post yet.`
+      showToast(
+        `"${video.title}" was already on the Metricool calendar. Unscheduled here — remove/cancel it in Metricool manually too, this app can't auto-cancel a Metricool post yet.`,
+        "error",
+        true
       );
     }
     loadAll();
@@ -230,14 +232,14 @@ document.getElementById("publishBtn").addEventListener("click", async () => {
   const queue = await api("/api/queue");
   const pending = queue.filter((v) => !v.metricool_added_at);
   if (pending.length === 0) {
-    alert("Nothing to publish — every queued video is already on the Metricool calendar.");
+    showToast("Nothing to publish — every queued video is already on the Metricool calendar.");
     return;
   }
-  alert(
-    `${pending.length} video(s) ready to add to the Metricool calendar.\n\n` +
-    `This app can't call Metricool directly — only a live Claude session can. ` +
-    `Let Claude know you clicked Publish and it will add these now. ` +
-    `Note: this also needs the public IP/port-forward set up so Metricool can fetch the video files.`
+  showToast(
+    `${pending.length} video(s) ready to add to the Metricool calendar. ` +
+    `Tell Claude you clicked Publish and it'll add these now (needs the public IP/port-forward set up first).`,
+    "info",
+    true
   );
 });
 
