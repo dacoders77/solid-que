@@ -97,7 +97,14 @@ section h2 {
 .card-body { padding: 12px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
 
 .card-meta-row { display: flex; align-items: center; justify-content: space-between; }
+.note-icons { display: flex; gap: 4px; }
 .icon-btn { padding: 2px 8px; font-size: 14px; line-height: 1; }
+
+.card.noted-down {
+  opacity: 0.4;
+  filter: grayscale(1);
+  transition: opacity 200ms ease, filter 200ms ease;
+}
 
 .card-id { font-size: 11px; color: var(--muted); font-family: monospace; }
 .card-title { font-weight: 600; font-size: 14px; }
