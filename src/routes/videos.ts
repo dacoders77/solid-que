@@ -98,7 +98,13 @@ videosRouter.post("/api/videos/:id/open-folder", (req, res) => {
   }
   // /select, opens the folder AND highlights the file, which is much more
   // obviously "something happened" than opening a bare folder window.
-  const child = spawn("explorer.exe", [`/select,${video.video_path}`], {
+  // explorer.exe's argument parsing is quirky with spaces (e.g. "v2b bad.mp4")
+  // when passed via spawn's normal argv array — Node's auto-quoting wraps the
+  // whole "/select,path" token in one pair of quotes, which explorer.exe
+  // doesn't parse correctly and silently falls back to the default folder.
+  // Building the exact command string ourselves with shell:true avoids that.
+  const child = spawn(`explorer.exe /select,"${video.video_path}"`, {
+    shell: true,
     detached: true,
     stdio: "ignore",
   });
