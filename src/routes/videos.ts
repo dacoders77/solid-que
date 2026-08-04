@@ -14,6 +14,10 @@ videosRouter.get("/api/videos/pending", (_req, res) => {
   res.json(listByStatus("pending_review"));
 });
 
+videosRouter.get("/api/videos/trash", (_req, res) => {
+  res.json(listByStatus("rejected"));
+});
+
 videosRouter.get("/api/queue", (_req, res) => {
   res.json(listQueue());
 });
@@ -96,7 +100,9 @@ videosRouter.post("/api/videos/:id/approve", (req, res) => {
   res.json({ ok: true, scheduled_time: scheduledTime });
 });
 
-// Send a queued video back to pending review (e.g. approved by mistake).
+// Send a video back to pending review — from the queue (approved by
+// mistake) or from trash (rejected by mistake). If it's currently sitting
+// in the trash folder, the file moves back into normal managed storage.
 videosRouter.post("/api/videos/:id/return-to-review", (req, res) => {
   const id = Number(req.params.id);
   const video = getById(id);
@@ -105,10 +111,50 @@ videosRouter.post("/api/videos/:id/return-to-review", (req, res) => {
     return;
   }
   withUndo("return-to-review", [id], () => {
+    const videosDir = path.join(config.storageDir, "videos");
+    const thumbsDir = path.join(config.storageDir, "thumbnails");
+
+    let restoredVideoPath = video.video_path;
+    if (video.video_path.includes(`${path.sep}trash${path.sep}`) && fs.existsSync(video.video_path)) {
+      fs.mkdirSync(videosDir, { recursive: true });
+      restoredVideoPath = path.join(videosDir, path.basename(video.video_path));
+      fs.renameSync(video.video_path, restoredVideoPath);
+    }
+    let restoredThumbPath = video.thumbnail_path;
+    if (
+      video.thumbnail_path &&
+      video.thumbnail_path.includes(`${path.sep}trash${path.sep}`) &&
+      fs.existsSync(video.thumbnail_path)
+    ) {
+      fs.mkdirSync(thumbsDir, { recursive: true });
+      restoredThumbPath = path.join(thumbsDir, path.basename(video.thumbnail_path));
+      fs.renameSync(video.thumbnail_path, restoredThumbPath);
+    }
+
     db.prepare(
-      `UPDATE videos SET status = 'pending_review', queue_position = NULL, scheduled_time = NULL, postponed_until = NULL, updated_at = datetime('now') WHERE id = ?`
-    ).run(id);
+      `UPDATE videos SET status = 'pending_review', video_path = ?, thumbnail_path = ?, queue_position = NULL, scheduled_time = NULL, postponed_until = NULL, updated_at = datetime('now') WHERE id = ?`
+    ).run(restoredVideoPath, restoredThumbPath, id);
   });
+  res.json({ ok: true });
+});
+
+// Delete forever: permanently removes the file and DB row. Not undoable —
+// this is the one truly destructive action in the app, reached only from
+// the trash page.
+videosRouter.post("/api/videos/:id/delete-forever", (req, res) => {
+  const id = Number(req.params.id);
+  const video = getById(id);
+  if (!video) {
+    res.status(404).json({ error: "not found" });
+    return;
+  }
+  if (video.video_path && fs.existsSync(video.video_path)) {
+    fs.rmSync(video.video_path, { force: true });
+  }
+  if (video.thumbnail_path && fs.existsSync(video.thumbnail_path)) {
+    fs.rmSync(video.thumbnail_path, { force: true });
+  }
+  db.prepare(`DELETE FROM videos WHERE id = ?`).run(id);
   res.json({ ok: true });
 });
 

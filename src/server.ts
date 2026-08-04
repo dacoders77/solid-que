@@ -48,6 +48,10 @@ app.get("/", (_req, res) => {
   res.sendFile("index.html", { root: path.join(__dirname, "..", "public") });
 });
 
+app.get("/trash", (_req, res) => {
+  res.sendFile("trash.html", { root: path.join(__dirname, "..", "public") });
+});
+
 app.use(videosRouter);
 
 app.use("/storage", express.static(config.storageDir));

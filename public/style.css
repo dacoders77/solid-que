@@ -41,6 +41,19 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .header-actions { display: flex; gap: 8px; align-items: center; }
 
+.header-actions a {
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13px;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+.header-actions a:hover { border-color: var(--accent); }
+
 .card.fading-out {
   opacity: 0;
   transform: scale(0.92);
