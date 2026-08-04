@@ -236,8 +236,7 @@ document.getElementById("publishBtn").addEventListener("click", async () => {
     return;
   }
   showToast(
-    `${pending.length} video(s) ready to add to the Metricool calendar. ` +
-    `Tell Claude you clicked Publish and it'll add these now (needs the public IP/port-forward set up first).`,
+    `${pending.length} video(s) ready to add to the Metricool calendar.`,
     "info",
     true
   );
