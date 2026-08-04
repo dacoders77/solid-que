@@ -136,7 +136,10 @@ videosRouter.post("/api/videos/:id/approve", (req, res) => {
 
 // Send a video back to pending review — from the queue (approved by
 // mistake) or from trash (rejected by mistake). Files are never moved by
-// this app, so this is a pure status change.
+// this app, so this is a pure status change. If it had already been added
+// to Metricool's calendar, that gets cleared here too — the caller gets
+// back needs_metricool_cleanup so the UI can flag it (there's no API to
+// auto-cancel the Metricool-side post yet).
 videosRouter.post("/api/videos/:id/return-to-review", (req, res) => {
   const id = Number(req.params.id);
   const video = getById(id);
@@ -144,12 +147,17 @@ videosRouter.post("/api/videos/:id/return-to-review", (req, res) => {
     res.status(404).json({ error: "not found" });
     return;
   }
+  const hadMetricoolPost = Boolean(video.metricool_added_at);
   withUndo("return-to-review", [id], () => {
     db.prepare(
-      `UPDATE videos SET status = 'pending_review', queue_position = NULL, scheduled_time = NULL, postponed_until = NULL, updated_at = datetime('now') WHERE id = ?`
+      `UPDATE videos SET status = 'pending_review', queue_position = NULL, scheduled_time = NULL, postponed_until = NULL, metricool_added_at = NULL, metricool_post_ids = NULL, updated_at = datetime('now') WHERE id = ?`
     ).run(id);
   });
-  res.json({ ok: true });
+  res.json({
+    ok: true,
+    needs_metricool_cleanup: hadMetricoolPost,
+    metricool_post_ids: hadMetricoolPost ? video.metricool_post_ids : null,
+  });
 });
 
 // Delete forever: permanently removes the file and DB row. Not undoable —

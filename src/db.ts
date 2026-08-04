@@ -38,6 +38,18 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_videos_queue_position ON videos(queue_position);
 `);
 
+// Idempotent migration: add columns that didn't exist in earlier schema
+// versions, since CREATE TABLE IF NOT EXISTS doesn't alter existing tables.
+const existingColumns = new Set(
+  (db.prepare(`PRAGMA table_info(videos)`).all() as { name: string }[]).map((c) => c.name)
+);
+if (!existingColumns.has("metricool_added_at")) {
+  db.exec(`ALTER TABLE videos ADD COLUMN metricool_added_at TEXT`);
+}
+if (!existingColumns.has("metricool_post_ids")) {
+  db.exec(`ALTER TABLE videos ADD COLUMN metricool_post_ids TEXT`);
+}
+
 // "queued" = approved and sitting in the publish queue (ordered by queue_position)
 export type VideoStatus =
   | "pending_review"
@@ -64,6 +76,8 @@ export interface VideoRow {
   facebook_link: string;
   tiktok_link: string;
   publish_error: string;
+  metricool_added_at: string | null;
+  metricool_post_ids: string | null;
   created_at: string;
   updated_at: string;
 }

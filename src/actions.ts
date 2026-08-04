@@ -48,7 +48,8 @@ function applyRow(target: VideoRow) {
        video_path = ?, thumbnail_path = ?, status = ?, queue_position = ?,
        scheduled_time = ?, postponed_until = ?, youtube_link = ?,
        instagram_link = ?, facebook_link = ?, tiktok_link = ?,
-       publish_error = ?, updated_at = datetime('now')
+       publish_error = ?, metricool_added_at = ?, metricool_post_ids = ?,
+       updated_at = datetime('now')
      WHERE id = ?`
   ).run(
     target.title,
@@ -66,6 +67,8 @@ function applyRow(target: VideoRow) {
     target.facebook_link,
     target.tiktok_link,
     target.publish_error,
+    target.metricool_added_at,
+    target.metricool_post_ids,
     target.id
   );
 }

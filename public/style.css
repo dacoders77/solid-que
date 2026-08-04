@@ -186,6 +186,7 @@ section h2 {
 
 .slot-card-body { padding: 6px; font-size: 11px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
 .slot-card-id { color: var(--muted); font-family: monospace; }
+.metricool-badge { font-family: initial; cursor: help; }
 .slot-card-title { font-weight: 600; line-height: 1.2; }
 .slot-card-actions { margin-top: auto; display: flex; gap: 4px; }
 .slot-card-actions button { padding: 2px 6px; font-size: 10px; }

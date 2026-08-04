@@ -28,6 +28,37 @@ publishRouter.get("/api/publish/due", (_req, res) => {
   res.json(rows.map(serialize));
 });
 
+// Queued videos not yet pushed into Metricool's calendar. Unlike /due,
+// this ignores scheduled_time — the whole point of createScheduledPost is
+// to hand Metricool a future date/time, so these get added ahead of time,
+// not only once they're due.
+publishRouter.get("/api/publish/pending-metricool", (_req, res) => {
+  const rows = db
+    .prepare(
+      `SELECT * FROM videos
+       WHERE status = 'queued' AND metricool_added_at IS NULL
+       ORDER BY scheduled_time ASC, created_at ASC`
+    )
+    .all() as unknown as VideoRow[];
+  res.json(rows.map(serialize));
+});
+
+// Worker (Claude, via the Metricool connector) reports back after
+// successfully calling createScheduledPost for all 4 networks.
+publishRouter.post("/api/publish/:id/metricool-added", (req, res) => {
+  const id = Number(req.params.id);
+  const video = getById(id);
+  if (!video) {
+    res.status(404).json({ error: "not found" });
+    return;
+  }
+  const { post_ids } = req.body ?? {};
+  db.prepare(
+    `UPDATE videos SET metricool_added_at = datetime('now'), metricool_post_ids = ?, updated_at = datetime('now') WHERE id = ?`
+  ).run(post_ids ? JSON.stringify(post_ids) : null, id);
+  res.json({ ok: true });
+});
+
 // Marks a video as currently being published (prevents double-processing
 // if the worker is triggered manually while the hourly run is also active).
 publishRouter.post("/api/publish/:id/start", (req, res) => {

@@ -98,10 +98,13 @@ function slotCard(video) {
   const el = document.createElement("div");
   el.className = "slot-card";
   el.draggable = true;
+  const metricoolBadge = video.metricool_added_at
+    ? `<span class="metricool-badge" title="Added to Metricool calendar on ${escapeHtml(video.metricool_added_at)}">☁️</span>`
+    : "";
   el.innerHTML = `
     <video src="${video.video_url}" muted preload="metadata"></video>
     <div class="slot-card-body">
-      <div class="slot-card-id">#${video.id}</div>
+      <div class="slot-card-id">#${video.id} ${metricoolBadge}</div>
       <div class="slot-card-title">${escapeHtml(video.title)}</div>
       <div class="slot-card-actions">
         <button data-action="unqueue">Return to Approve Queue</button>
@@ -114,7 +117,12 @@ function slotCard(video) {
   });
   el.querySelector('[data-action="unqueue"]').addEventListener("click", async (e) => {
     e.stopPropagation();
-    await api(`/api/videos/${video.id}/return-to-review`, { method: "POST" });
+    const result = await api(`/api/videos/${video.id}/return-to-review`, { method: "POST" });
+    if (result.needs_metricool_cleanup) {
+      alert(
+        `"${video.title}" was already added to the Metricool calendar. It has been unscheduled here, but you'll need to remove/cancel it in Metricool manually too — this app can't auto-cancel a Metricool post yet.`
+      );
+    }
     loadAll();
   });
   return el;
@@ -216,6 +224,21 @@ document.getElementById("undoBtn").addEventListener("click", async () => {
 document.getElementById("redoBtn").addEventListener("click", async () => {
   await api("/api/redo", { method: "POST" });
   loadAll();
+});
+
+document.getElementById("publishBtn").addEventListener("click", async () => {
+  const queue = await api("/api/queue");
+  const pending = queue.filter((v) => !v.metricool_added_at);
+  if (pending.length === 0) {
+    alert("Nothing to publish — every queued video is already on the Metricool calendar.");
+    return;
+  }
+  alert(
+    `${pending.length} video(s) ready to add to the Metricool calendar.\n\n` +
+    `This app can't call Metricool directly — only a live Claude session can. ` +
+    `Let Claude know you clicked Publish and it will add these now. ` +
+    `Note: this also needs the public IP/port-forward set up so Metricool can fetch the video files.`
+  );
 });
 
 document.getElementById("logoutBtn").addEventListener("click", async () => {
