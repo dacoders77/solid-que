@@ -40,11 +40,11 @@ function pendingCard(video) {
     <div class="card-body">
       <div class="card-meta-row">
         <span class="status-badge">${video.status}</span>
-        <div class="note-icons">
-          <button class="icon-btn" data-action="note-up" title="Like (note only, no action)">👍</button>
-          <button class="icon-btn" data-action="note-down" title="Dislike (note only, no action)">👎</button>
-          <button class="icon-btn" data-action="open-folder" title="${escapeHtml(folderPath)}">📁</button>
-        </div>
+      </div>
+      <div class="note-icons">
+        <button class="icon-btn" data-action="note-up" title="Like (note only, no action)">👍</button>
+        <button class="icon-btn" data-action="note-down" title="Dislike (note only, no action)">👎</button>
+        <button class="icon-btn" data-action="open-folder" title="${escapeHtml(folderPath)}">📁</button>
       </div>
       <div class="card-id">#${video.id}</div>
       <div class="card-title">${escapeHtml(video.title)}</div>

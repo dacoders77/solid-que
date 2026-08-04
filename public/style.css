@@ -97,8 +97,8 @@ section h2 {
 .card-body { padding: 12px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
 
 .card-meta-row { display: flex; align-items: center; justify-content: space-between; }
-.note-icons { display: flex; gap: 4px; }
-.icon-btn { padding: 2px 8px; font-size: 14px; line-height: 1; }
+.note-icons { display: flex; gap: 4px; flex-wrap: wrap; }
+.icon-btn { padding: 2px 6px; font-size: 12px; line-height: 1.4; }
 
 .card.noted-down {
   opacity: 0.4;
