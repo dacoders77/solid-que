@@ -232,11 +232,11 @@ document.getElementById("publishBtn").addEventListener("click", async () => {
   const queue = await api("/api/queue");
   const pending = queue.filter((v) => !v.metricool_added_at);
   if (pending.length === 0) {
-    showToast("Nothing to publish — every queued video is already on the Metricool calendar.");
+    showToast("Every queued video is already on the Metricool calendar.");
     return;
   }
   showToast(
-    `${pending.length} video(s) ready to add to the Metricool calendar.`,
+    `${pending.length} video(s) waiting — the background worker adds them within 5 minutes.`,
     "info",
     true
   );

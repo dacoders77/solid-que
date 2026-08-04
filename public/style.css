@@ -204,7 +204,7 @@ section h2 {
 
 #toastContainer {
   position: fixed;
-  bottom: 20px;
+  top: 66px;
   right: 20px;
   display: flex;
   flex-direction: column;
