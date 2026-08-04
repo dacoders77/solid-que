@@ -25,15 +25,22 @@ function fadeOutAndReload(el) {
   setTimeout(() => loadAll(), 280);
 }
 
+function folderOf(fullPath) {
+  const parts = fullPath.split(/[\\/]/);
+  parts.pop();
+  return parts.join("\\");
+}
+
 function pendingCard(video) {
   const el = document.createElement("div");
   el.className = "card";
+  const folderPath = folderOf(video.video_path);
   el.innerHTML = `
     <video src="${video.video_url}" controls preload="metadata"></video>
     <div class="card-body">
       <div class="card-meta-row">
         <span class="status-badge">${video.status}</span>
-        <button class="icon-btn" data-action="open-folder" title="Open containing folder">📁</button>
+        <button class="icon-btn" data-action="open-folder" title="${escapeHtml(folderPath)}">📁</button>
       </div>
       <div class="card-id">#${video.id}</div>
       <div class="card-title">${escapeHtml(video.title)}</div>
