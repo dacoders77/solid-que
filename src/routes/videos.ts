@@ -1,9 +1,12 @@
 import { Router } from "express";
 import fs from "node:fs";
+import path from "node:path";
+import { spawn } from "node:child_process";
 import { db, VideoRow } from "../db";
 import { getById, listByStatus, listQueue, serialize } from "../videos";
 import { nextAvailableSlot, dateKeyLocal, slotDateTime } from "../schedule";
-import { DAILY_SLOTS } from "../config";
+import { DAILY_SLOTS, config } from "../config";
+import { withUndo, undoLast, redoLast, undoRedoState } from "../actions";
 
 export const videosRouter = Router();
 
@@ -36,6 +39,18 @@ videosRouter.get("/api/schedule", (req, res) => {
   res.json(grid);
 });
 
+videosRouter.get("/api/undo-state", (_req, res) => {
+  res.json(undoRedoState());
+});
+
+videosRouter.post("/api/undo", (_req, res) => {
+  res.json(undoLast());
+});
+
+videosRouter.post("/api/redo", (_req, res) => {
+  res.json(redoLast());
+});
+
 videosRouter.get("/api/videos/:id", (req, res) => {
   const video = getById(Number(req.params.id));
   if (!video) {
@@ -43,6 +58,24 @@ videosRouter.get("/api/videos/:id", (req, res) => {
     return;
   }
   res.json(serialize(video));
+});
+
+// Opens the video's source folder in Windows Explorer, on the machine
+// running this server. Only meaningful when the dashboard is used from the
+// same PC as the server (not over the port-forwarded remote connection).
+videosRouter.post("/api/videos/:id/open-folder", (req, res) => {
+  const video = getById(Number(req.params.id));
+  if (!video) {
+    res.status(404).json({ error: "not found" });
+    return;
+  }
+  const folder = path.dirname(video.video_path);
+  if (!fs.existsSync(folder)) {
+    res.status(404).json({ error: `folder does not exist: ${folder}` });
+    return;
+  }
+  spawn("explorer.exe", [folder], { detached: true }).unref();
+  res.json({ ok: true });
 });
 
 // Approve: moves a pending_review video into the queue, auto-assigned to
@@ -55,9 +88,11 @@ videosRouter.post("/api/videos/:id/approve", (req, res) => {
     return;
   }
   const scheduledTime = nextAvailableSlot();
-  db.prepare(
-    `UPDATE videos SET status = 'queued', scheduled_time = ?, updated_at = datetime('now') WHERE id = ?`
-  ).run(scheduledTime, id);
+  withUndo("approve", [id], () => {
+    db.prepare(
+      `UPDATE videos SET status = 'queued', scheduled_time = ?, updated_at = datetime('now') WHERE id = ?`
+    ).run(scheduledTime, id);
+  });
   res.json({ ok: true, scheduled_time: scheduledTime });
 });
 
@@ -69,13 +104,16 @@ videosRouter.post("/api/videos/:id/return-to-review", (req, res) => {
     res.status(404).json({ error: "not found" });
     return;
   }
-  db.prepare(
-    `UPDATE videos SET status = 'pending_review', queue_position = NULL, scheduled_time = NULL, postponed_until = NULL, updated_at = datetime('now') WHERE id = ?`
-  ).run(id);
+  withUndo("return-to-review", [id], () => {
+    db.prepare(
+      `UPDATE videos SET status = 'pending_review', queue_position = NULL, scheduled_time = NULL, postponed_until = NULL, updated_at = datetime('now') WHERE id = ?`
+    ).run(id);
+  });
   res.json({ ok: true });
 });
 
-// Reject: deletes the file and the DB row entirely.
+// Reject: soft-deletes. The file moves into a trash folder (not permanently
+// removed) and the row is marked 'rejected', so this can be undone.
 videosRouter.post("/api/videos/:id/reject", (req, res) => {
   const id = Number(req.params.id);
   const video = getById(id);
@@ -83,13 +121,29 @@ videosRouter.post("/api/videos/:id/reject", (req, res) => {
     res.status(404).json({ error: "not found" });
     return;
   }
-  if (video.video_path && fs.existsSync(video.video_path)) {
-    fs.rmSync(video.video_path, { force: true });
-  }
-  if (video.thumbnail_path && fs.existsSync(video.thumbnail_path)) {
-    fs.rmSync(video.thumbnail_path, { force: true });
-  }
-  db.prepare(`DELETE FROM videos WHERE id = ?`).run(id);
+
+  withUndo("reject", [id], () => {
+    const trashVideosDir = path.join(config.storageDir, "trash", "videos");
+    const trashThumbsDir = path.join(config.storageDir, "trash", "thumbnails");
+    fs.mkdirSync(trashVideosDir, { recursive: true });
+    fs.mkdirSync(trashThumbsDir, { recursive: true });
+
+    let newVideoPath = video.video_path;
+    if (video.video_path && fs.existsSync(video.video_path)) {
+      newVideoPath = path.join(trashVideosDir, path.basename(video.video_path));
+      fs.renameSync(video.video_path, newVideoPath);
+    }
+    let newThumbPath = video.thumbnail_path;
+    if (video.thumbnail_path && fs.existsSync(video.thumbnail_path)) {
+      newThumbPath = path.join(trashThumbsDir, path.basename(video.thumbnail_path));
+      fs.renameSync(video.thumbnail_path, newThumbPath);
+    }
+
+    db.prepare(
+      `UPDATE videos SET status = 'rejected', video_path = ?, thumbnail_path = ?, queue_position = NULL, scheduled_time = NULL, postponed_until = NULL, updated_at = datetime('now') WHERE id = ?`
+    ).run(newVideoPath, newThumbPath, id);
+  });
+
   res.json({ ok: true });
 });
 
@@ -102,9 +156,11 @@ videosRouter.post("/api/videos/:id/postpone", (req, res) => {
     res.status(404).json({ error: "not found" });
     return;
   }
-  db.prepare(
-    `UPDATE videos SET postponed_until = ?, updated_at = datetime('now') WHERE id = ?`
-  ).run(typeof until === "string" ? until : null, id);
+  withUndo("postpone", [id], () => {
+    db.prepare(
+      `UPDATE videos SET postponed_until = ?, updated_at = datetime('now') WHERE id = ?`
+    ).run(typeof until === "string" ? until : null, id);
+  });
   res.json({ ok: true });
 });
 
@@ -130,15 +186,17 @@ videosRouter.post("/api/videos/:id/schedule", (req, res) => {
     )
     .get(scheduled_time, id) as VideoRow | undefined;
 
-  if (occupant) {
+  const affectedIds = occupant ? [id, occupant.id] : [id];
+  withUndo("schedule", affectedIds, () => {
+    if (occupant) {
+      db.prepare(
+        `UPDATE videos SET scheduled_time = ?, updated_at = datetime('now') WHERE id = ?`
+      ).run(video.scheduled_time, occupant.id);
+    }
     db.prepare(
       `UPDATE videos SET scheduled_time = ?, updated_at = datetime('now') WHERE id = ?`
-    ).run(video.scheduled_time, occupant.id);
-  }
-
-  db.prepare(
-    `UPDATE videos SET scheduled_time = ?, updated_at = datetime('now') WHERE id = ?`
-  ).run(scheduled_time, id);
+    ).run(scheduled_time, id);
+  });
 
   res.json({ ok: true });
 });

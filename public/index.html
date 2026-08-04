@@ -4,12 +4,16 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>solid-que</title>
-<link rel="stylesheet" href="/style.css" />
+<link rel="stylesheet" href="/style.css?v=4" />
 </head>
 <body>
   <header>
     <h1>solid-que</h1>
-    <button id="logoutBtn">Log out</button>
+    <div class="header-actions">
+      <button id="undoBtn" title="Undo">↺ Undo</button>
+      <button id="redoBtn" title="Redo">↻ Redo</button>
+      <button id="logoutBtn">Log out</button>
+    </div>
   </header>
 
   <main>
@@ -24,6 +28,6 @@
     </section>
   </main>
 
-  <script src="/app.js"></script>
+  <script src="/app.js?v=4"></script>
 </body>
 </html>

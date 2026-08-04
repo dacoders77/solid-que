@@ -20,30 +20,52 @@ function escapeHtml(str) {
   }[c]));
 }
 
+function fadeOutAndReload(el) {
+  el.classList.add("fading-out");
+  setTimeout(() => loadAll(), 280);
+}
+
 function pendingCard(video) {
   const el = document.createElement("div");
   el.className = "card";
   el.innerHTML = `
     <video src="${video.video_url}" controls preload="metadata"></video>
     <div class="card-body">
-      <span class="status-badge">${video.status}</span>
+      <div class="card-meta-row">
+        <span class="status-badge">${video.status}</span>
+        <button class="icon-btn" data-action="open-folder" title="Open containing folder">📁</button>
+      </div>
       <div class="card-id">#${video.id}</div>
       <div class="card-title">${escapeHtml(video.title)}</div>
       <div class="card-desc">${escapeHtml(video.description)}</div>
       <div class="card-actions">
         <button class="primary" data-action="approve">Approve</button>
-        <button data-action="reject">Delete</button>
+        <button data-action="reject">Reject</button>
       </div>
     </div>
   `;
   el.querySelector('[data-action="approve"]').addEventListener("click", async () => {
-    await api(`/api/videos/${video.id}/approve`, { method: "POST" });
-    loadAll();
+    try {
+      await api(`/api/videos/${video.id}/approve`, { method: "POST" });
+      fadeOutAndReload(el);
+    } catch (err) {
+      alert(`Approve failed: ${err.message}`);
+    }
   });
   el.querySelector('[data-action="reject"]').addEventListener("click", async () => {
-    if (!confirm(`Delete "${video.title}"? This removes the file permanently.`)) return;
-    await api(`/api/videos/${video.id}/reject`, { method: "POST" });
-    loadAll();
+    try {
+      await api(`/api/videos/${video.id}/reject`, { method: "POST" });
+      fadeOutAndReload(el);
+    } catch (err) {
+      alert(`Reject failed: ${err.message}`);
+    }
+  });
+  el.querySelector('[data-action="open-folder"]').addEventListener("click", async () => {
+    try {
+      await api(`/api/videos/${video.id}/open-folder`, { method: "POST" });
+    } catch (err) {
+      alert(`Couldn't open folder: ${err.message}`);
+    }
   });
   return el;
 }
@@ -64,8 +86,7 @@ function slotCard(video) {
       <div class="slot-card-id">#${video.id}</div>
       <div class="slot-card-title">${escapeHtml(video.title)}</div>
       <div class="slot-card-actions">
-        <button data-action="unqueue" title="Return to review">↩</button>
-        <button data-action="reject" title="Remove">✕</button>
+        <button data-action="unqueue">Return to Approve Queue</button>
       </div>
     </div>
   `;
@@ -76,12 +97,6 @@ function slotCard(video) {
   el.querySelector('[data-action="unqueue"]').addEventListener("click", async (e) => {
     e.stopPropagation();
     await api(`/api/videos/${video.id}/return-to-review`, { method: "POST" });
-    loadAll();
-  });
-  el.querySelector('[data-action="reject"]').addEventListener("click", async (e) => {
-    e.stopPropagation();
-    if (!confirm(`Remove "${video.title}" from the schedule and delete the file?`)) return;
-    await api(`/api/videos/${video.id}/reject`, { method: "POST" });
     loadAll();
   });
   return el;
@@ -166,7 +181,24 @@ async function loadAll() {
   }
 
   await renderSchedule();
+  await refreshUndoState();
 }
+
+async function refreshUndoState() {
+  const { canUndo, canRedo } = await api("/api/undo-state");
+  document.getElementById("undoBtn").disabled = !canUndo;
+  document.getElementById("redoBtn").disabled = !canRedo;
+}
+
+document.getElementById("undoBtn").addEventListener("click", async () => {
+  await api("/api/undo", { method: "POST" });
+  loadAll();
+});
+
+document.getElementById("redoBtn").addEventListener("click", async () => {
+  await api("/api/redo", { method: "POST" });
+  loadAll();
+});
 
 document.getElementById("logoutBtn").addEventListener("click", async () => {
   await api("/api/logout", { method: "POST" });
