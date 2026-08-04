@@ -103,7 +103,11 @@ videosRouter.post("/api/videos/:id/open-folder", (req, res) => {
   // whole "/select,path" token in one pair of quotes, which explorer.exe
   // doesn't parse correctly and silently falls back to the default folder.
   // Building the exact command string ourselves with shell:true avoids that.
-  const child = spawn(`explorer.exe /select,"${video.video_path}"`, {
+  // explorer.exe also needs backslash-style paths — a forward-slash path
+  // (which fs/DB happily accept) fails to resolve and silently falls back
+  // to the default view too, so normalize before building the command.
+  const windowsPath = video.video_path.replace(/\//g, "\\");
+  const child = spawn(`explorer.exe /select,"${windowsPath}"`, {
     shell: true,
     detached: true,
     stdio: "ignore",
