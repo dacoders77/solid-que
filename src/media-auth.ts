@@ -18,7 +18,7 @@ function validToken(id: number, token: unknown): boolean {
 }
 
 export function requireSessionOrMediaToken(req: Request, res: Response, next: NextFunction) {
-  if (req.session.loggedIn) {
+  if (config.authDisabled || req.session.loggedIn) {
     next();
     return;
   }
