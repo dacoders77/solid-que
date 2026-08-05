@@ -81,7 +81,16 @@ async function loadVideo() {
   detail.innerHTML = `
     <div class="detail-grid">
       <div class="detail-media">
-        <video src="${video.video_url}" controls preload="metadata"></video>
+        <video id="player" src="${video.video_url}" controls preload="metadata"></video>
+        <div class="cover-picker">
+          <div class="detail-label">Pick cover frame</div>
+          <input type="range" id="coverSlider" min="0" max="0" step="0.05" value="0" disabled />
+          <div class="cover-picker-row">
+            <span id="coverTime" class="detail-muted">0.0s</span>
+            <button id="setCoverBtn">🖼 Set as cover</button>
+          </div>
+          <img id="coverPreview" class="cover-preview" src="${video.thumbnail_url || ""}" ${video.thumbnail_url ? "" : "hidden"} />
+        </div>
         <div class="detail-actions">
           <button id="openFolderBtn">📁 Open folder</button>
         </div>
@@ -105,6 +114,44 @@ async function loadVideo() {
       await api(`/api/videos/${video.id}/open-folder`, { method: "POST" });
     } catch (err) {
       showToast(`Couldn't open folder: ${err.message}`, "error");
+    }
+  });
+
+  const player = document.getElementById("player");
+  const slider = document.getElementById("coverSlider");
+  const timeLabel = document.getElementById("coverTime");
+  const setCoverBtn = document.getElementById("setCoverBtn");
+  const preview = document.getElementById("coverPreview");
+
+  player.addEventListener("loadedmetadata", () => {
+    slider.max = String(player.duration);
+    slider.disabled = false;
+  });
+  slider.addEventListener("input", () => {
+    player.currentTime = Number(slider.value);
+    timeLabel.textContent = `${Number(slider.value).toFixed(1)}s`;
+  });
+  player.addEventListener("timeupdate", () => {
+    slider.value = String(player.currentTime);
+    timeLabel.textContent = `${player.currentTime.toFixed(1)}s`;
+  });
+
+  setCoverBtn.addEventListener("click", async () => {
+    setCoverBtn.disabled = true;
+    setCoverBtn.textContent = "Capturing…";
+    try {
+      const result = await api(`/api/videos/${video.id}/thumbnail-frame`, {
+        method: "POST",
+        body: JSON.stringify({ time: player.currentTime }),
+      });
+      preview.src = `${result.thumbnail_url}?t=${Date.now()}`;
+      preview.hidden = false;
+      showToast("Cover frame set.", "success");
+    } catch (err) {
+      showToast(`Couldn't set cover: ${err.message}`, "error");
+    } finally {
+      setCoverBtn.disabled = false;
+      setCoverBtn.textContent = "🖼 Set as cover";
     }
   });
 }

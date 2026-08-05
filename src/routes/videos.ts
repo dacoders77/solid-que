@@ -1,10 +1,11 @@
 import { Router } from "express";
 import fs from "node:fs";
-import { spawn } from "node:child_process";
+import path from "node:path";
+import { spawn, spawnSync } from "node:child_process";
 import { db, VideoRow, NetworkSettingRow } from "../db";
 import { getById, listByStatus, listQueue, serialize } from "../videos";
 import { nextAvailableSlot, dateKeyLocal, slotDateTime } from "../schedule";
-import { DAILY_SLOTS } from "../config";
+import { DAILY_SLOTS, config } from "../config";
 import { withUndo, undoLast, redoLast, undoRedoState } from "../actions";
 
 export const videosRouter = Router();
@@ -129,6 +130,53 @@ videosRouter.post("/api/videos/:id/open-folder", (req, res) => {
   });
   child.unref();
   res.json({ ok: true, opened: video.video_path });
+});
+
+// Capture a specific frame from the video as its cover thumbnail, via
+// ffmpeg. Generates a new file — doesn't touch/move the source video.
+videosRouter.post("/api/videos/:id/thumbnail-frame", (req, res) => {
+  const id = Number(req.params.id);
+  const video = getById(id);
+  if (!video) {
+    res.status(404).json({ error: "not found" });
+    return;
+  }
+  const time = Number(req.body?.time);
+  if (!Number.isFinite(time) || time < 0) {
+    res.status(400).json({ error: "time (seconds, >= 0) is required" });
+    return;
+  }
+  if (!fs.existsSync(video.video_path)) {
+    res.status(404).json({ error: `video file does not exist: ${video.video_path}` });
+    return;
+  }
+
+  fs.mkdirSync(config.thumbnailsDir, { recursive: true });
+  const outPath = path.join(config.thumbnailsDir, `${id}-${Date.now()}.jpg`);
+
+  const result = spawnSync(
+    "ffmpeg",
+    ["-y", "-ss", String(time), "-i", video.video_path, "-frames:v", "1", "-q:v", "2", outPath],
+    { timeout: 15000 }
+  );
+
+  if (result.status !== 0 || !fs.existsSync(outPath)) {
+    res.status(500).json({
+      error: `ffmpeg failed: ${result.stderr?.toString().slice(-500) ?? "unknown error"}`,
+    });
+    return;
+  }
+
+  const oldThumb = video.thumbnail_path;
+  db.prepare(
+    `UPDATE videos SET thumbnail_path = ?, updated_at = datetime('now') WHERE id = ?`
+  ).run(outPath, id);
+
+  if (oldThumb && oldThumb !== outPath && fs.existsSync(oldThumb)) {
+    fs.rmSync(oldThumb, { force: true });
+  }
+
+  res.json({ ok: true, thumbnail_url: `/api/videos/${id}/thumbnail` });
 });
 
 // Approve: moves a pending_review video into the queue, auto-assigned to

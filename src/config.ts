@@ -20,6 +20,10 @@ export const config = {
   // Claude publish worker) that aren't browser sessions.
   serviceToken: process.env.SERVICE_TOKEN ?? "",
   dbPath: path.resolve(process.env.DB_PATH ?? "./data/solid-que.db"),
+  // Generated cover-frame thumbnails live here — these are new files this
+  // app creates itself, not copies/moves of source video (that rule only
+  // ever applied to the original render files).
+  thumbnailsDir: path.resolve(process.env.THUMBNAILS_DIR ?? "./data/thumbnails"),
   // Public base URL (e.g. a Cloudflare quick tunnel), used to build media
   // URLs external services like Metricool can actually fetch. Empty means
   // no public URL is configured yet.
