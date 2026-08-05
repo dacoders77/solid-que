@@ -91,7 +91,6 @@ async function loadVideo() {
         ${field("ID", `#${video.id}`)}
         ${field("Title", escapeHtml(video.title))}
         ${field("Description", escapeHtml(video.description).replace(/\n/g, "<br>"))}
-        ${field("Transcript", escapeHtml(video.transcript).replace(/\n/g, "<br>"))}
         ${field("Source project", escapeHtml(video.source_project) || "—")}
         ${field("Scheduled time", video.scheduled_time ? escapeHtml(video.scheduled_time) : "—")}
         ${field("Metricool", metricoolInfoHtml(video))}
