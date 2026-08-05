@@ -22,7 +22,7 @@ export function verifyPassword(username: string, password: string): boolean {
 }
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
-  if (req.session.loggedIn) {
+  if (config.authDisabled || req.session.loggedIn) {
     next();
     return;
   }

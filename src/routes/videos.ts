@@ -1,7 +1,7 @@
 import { Router } from "express";
 import fs from "node:fs";
 import { spawn } from "node:child_process";
-import { db, VideoRow } from "../db";
+import { db, VideoRow, NetworkSettingRow } from "../db";
 import { getById, listByStatus, listQueue, serialize } from "../videos";
 import { nextAvailableSlot, dateKeyLocal, slotDateTime } from "../schedule";
 import { DAILY_SLOTS } from "../config";
@@ -11,6 +11,28 @@ export const videosRouter = Router();
 
 videosRouter.get("/api/videos/pending", (_req, res) => {
   res.json(listByStatus("pending_review"));
+});
+
+videosRouter.get("/api/settings/networks", (_req, res) => {
+  const rows = db.prepare(`SELECT * FROM network_settings ORDER BY network`).all();
+  res.json(rows);
+});
+
+videosRouter.post("/api/settings/networks/:network/toggle", (req, res) => {
+  const { network } = req.params;
+  const { enabled } = req.body ?? {};
+  const row = db
+    .prepare(`SELECT * FROM network_settings WHERE network = ?`)
+    .get(network) as NetworkSettingRow | undefined;
+  if (!row) {
+    res.status(404).json({ error: "unknown network" });
+    return;
+  }
+  db.prepare(`UPDATE network_settings SET enabled = ? WHERE network = ?`).run(
+    enabled ? 1 : 0,
+    network
+  );
+  res.json({ ok: true });
 });
 
 videosRouter.get("/api/videos/trash", (_req, res) => {

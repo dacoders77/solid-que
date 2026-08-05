@@ -13,6 +13,9 @@ export const config = {
   sessionSecret: required("SESSION_SECRET", "dev-secret-change-me"),
   authUsername: required("AUTH_USERNAME", "admin"),
   authPasswordHash: process.env.AUTH_PASSWORD_HASH ?? "",
+  // Kill switch for login while the app is only reachable on localhost.
+  // Flip back to false once this is exposed beyond your own machine.
+  authDisabled: process.env.AUTH_DISABLED === "true",
   // Shared secret for machine-to-machine callers (render pipeline ingest,
   // Claude publish worker) that aren't browser sessions.
   serviceToken: process.env.SERVICE_TOKEN ?? "",

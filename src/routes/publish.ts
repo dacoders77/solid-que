@@ -6,6 +6,16 @@ import { requireServiceToken } from "../service-auth";
 export const publishRouter = Router();
 publishRouter.use("/api/publish", requireServiceToken);
 
+// Which networks the worker should actually post to. Read-only for the
+// worker — toggling happens through the session-gated /api/settings/networks
+// (used by the settings page).
+publishRouter.get("/api/publish/enabled-networks", (_req, res) => {
+  const rows = db
+    .prepare(`SELECT network FROM network_settings WHERE enabled = 1 ORDER BY network`)
+    .all() as { network: string }[];
+  res.json(rows.map((r) => r.network));
+});
+
 // Polled by the Claude scheduled publish task (hourly + on manual request).
 // Returns queued videos that are due: no postponed_until in the future,
 // and either no scheduled_time set or scheduled_time has passed.

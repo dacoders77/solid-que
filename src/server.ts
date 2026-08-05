@@ -66,6 +66,11 @@ app.get("/trash", (_req, res) => {
   res.sendFile("trash.html", { root: path.join(__dirname, "..", "public") });
 });
 
+app.get("/settings", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.sendFile("settings.html", { root: path.join(__dirname, "..", "public") });
+});
+
 app.use(videosRouter);
 
 const server = app.listen(config.port, () => {

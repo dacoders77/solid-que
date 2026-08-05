@@ -36,7 +36,27 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_videos_status ON videos(status);
   CREATE INDEX IF NOT EXISTS idx_videos_queue_position ON videos(queue_position);
+
+  CREATE TABLE IF NOT EXISTS network_settings (
+    network TEXT PRIMARY KEY,
+    label TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1,
+    profile_url TEXT NOT NULL DEFAULT ''
+  );
 `);
+
+const networkCount = (
+  db.prepare(`SELECT COUNT(*) as n FROM network_settings`).get() as { n: number }
+).n;
+if (networkCount === 0) {
+  const insertNetwork = db.prepare(
+    `INSERT INTO network_settings (network, label, enabled, profile_url) VALUES (?, ?, 1, ?)`
+  );
+  insertNetwork.run("instagram", "Instagram", "https://www.instagram.com/solid.plumbing.electrical/");
+  insertNetwork.run("facebook", "Facebook", "https://www.facebook.com/256804020847358");
+  insertNetwork.run("tiktok", "TikTok", "https://www.tiktok.com/@solid.plumbing.electric");
+  insertNetwork.run("youtube", "YouTube", "https://www.youtube.com/channel/UCZVCjwfhpN8oiDTJJNT1bgg");
+}
 
 // Idempotent migration: add columns that didn't exist in earlier schema
 // versions, since CREATE TABLE IF NOT EXISTS doesn't alter existing tables.
@@ -80,4 +100,11 @@ export interface VideoRow {
   metricool_post_ids: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface NetworkSettingRow {
+  network: string;
+  label: string;
+  enabled: number;
+  profile_url: string;
 }
