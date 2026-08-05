@@ -23,8 +23,9 @@ function escapeHtml(str) {
 function trashCard(video) {
   const el = document.createElement("div");
   el.className = "card";
+  const poster = video.thumbnail_url ? ` poster="${video.thumbnail_url}"` : "";
   el.innerHTML = `
-    <video src="${video.video_url}" controls preload="metadata"></video>
+    <video src="${video.video_url}"${poster} controls preload="metadata"></video>
     <div class="card-body">
       <div class="card-id">#${video.id}</div>
       <div class="card-title">${escapeHtml(video.title)}</div>

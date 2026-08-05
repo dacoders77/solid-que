@@ -81,7 +81,7 @@ async function loadVideo() {
   detail.innerHTML = `
     <div class="detail-grid">
       <div class="detail-media">
-        <video id="player" src="${video.video_url}" controls preload="metadata"></video>
+        <video id="player" src="${video.video_url}"${video.thumbnail_url ? ` poster="${video.thumbnail_url}"` : ""} controls preload="metadata"></video>
         <div class="cover-picker">
           <div class="detail-label">Pick cover frame</div>
           <input type="range" id="coverSlider" min="0" max="0" step="0.05" value="0" disabled />

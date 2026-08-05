@@ -35,8 +35,9 @@ function pendingCard(video) {
   const el = document.createElement("div");
   el.className = "card";
   const folderPath = folderOf(video.video_path);
+  const poster = video.thumbnail_url ? ` poster="${video.thumbnail_url}"` : "";
   el.innerHTML = `
-    <video src="${video.video_url}" controls preload="metadata"></video>
+    <video src="${video.video_url}"${poster} controls preload="metadata"></video>
     <div class="card-body">
       <div class="card-meta-row">
         <span class="status-badge">${video.status}</span>
@@ -101,8 +102,9 @@ function slotCard(video) {
   const metricoolBadge = video.metricool_added_at
     ? `<span class="metricool-badge" title="Added to Metricool calendar on ${escapeHtml(video.metricool_added_at)}">☁️</span>`
     : "";
+  const poster = video.thumbnail_url ? ` poster="${video.thumbnail_url}"` : "";
   el.innerHTML = `
-    <video src="${video.video_url}" muted preload="metadata"></video>
+    <video src="${video.video_url}"${poster} muted preload="metadata"></video>
     <div class="slot-card-body">
       <div class="slot-card-id">
         #${video.id} ${metricoolBadge}
