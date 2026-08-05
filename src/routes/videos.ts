@@ -44,16 +44,29 @@ videosRouter.get("/api/queue", (_req, res) => {
 });
 
 // Calendar grid for the schedule table: one entry per day, each with the
-// 3 daily slots and whichever queued video (if any) occupies it.
+// 3 daily slots and whichever queued video (if any) occupies it. Anchored
+// at calendar_start_date (set once, on first ever run, and never moved) so
+// past days stay visible even after a video that used to reference that
+// date gets unqueued/rescheduled — history is never hidden.
 videosRouter.get("/api/schedule", (req, res) => {
-  const days = Math.min(60, Math.max(1, Number(req.query.days) || 14));
+  const forwardDays = Math.min(60, Math.max(1, Number(req.query.days) || 14));
   const queue = listQueue();
   const byTime = new Map(queue.map((v) => [v.scheduled_time, v]));
 
-  const today = new Date();
+  const today = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate());
+
+  const anchorRow = db
+    .prepare(`SELECT value FROM app_meta WHERE key = 'calendar_start_date'`)
+    .get() as { value: string };
+  const [ay, am, ad] = anchorRow.value.split("-").map(Number);
+  const start = new Date(ay, am - 1, ad);
+
+  const totalDays =
+    Math.round((today.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)) + forwardDays;
+
   const grid = [];
-  for (let i = 0; i < days; i++) {
-    const day = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i);
+  for (let i = 0; i < totalDays; i++) {
+    const day = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
     const dateKey = dateKeyLocal(day);
     const slots = DAILY_SLOTS.map((slot) => {
       const datetime = slotDateTime(dateKey, slot);
@@ -149,17 +162,18 @@ videosRouter.post("/api/videos/:id/return-to-review", (req, res) => {
     res.status(404).json({ error: "not found" });
     return;
   }
-  const hadMetricoolPost = Boolean(video.metricool_added_at);
+  if (video.metricool_added_at) {
+    res.status(409).json({
+      error: "You can't remove published video. Delete it from Metricool calendar",
+    });
+    return;
+  }
   withUndo("return-to-review", [id], () => {
     db.prepare(
-      `UPDATE videos SET status = 'pending_review', queue_position = NULL, scheduled_time = NULL, postponed_until = NULL, metricool_added_at = NULL, metricool_post_ids = NULL, updated_at = datetime('now') WHERE id = ?`
+      `UPDATE videos SET status = 'pending_review', queue_position = NULL, scheduled_time = NULL, postponed_until = NULL, updated_at = datetime('now') WHERE id = ?`
     ).run(id);
   });
-  res.json({
-    ok: true,
-    needs_metricool_cleanup: hadMetricoolPost,
-    metricool_post_ids: hadMetricoolPost ? video.metricool_post_ids : null,
-  });
+  res.json({ ok: true });
 });
 
 // Delete forever: permanently removes the file and DB row. Not undoable —

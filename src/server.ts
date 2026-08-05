@@ -71,6 +71,11 @@ app.get("/settings", (_req, res) => {
   res.sendFile("settings.html", { root: path.join(__dirname, "..", "public") });
 });
 
+app.get("/video/:id", (_req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.sendFile("video.html", { root: path.join(__dirname, "..", "public") });
+});
+
 app.use(videosRouter);
 
 const server = app.listen(config.port, () => {

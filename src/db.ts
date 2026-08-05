@@ -43,7 +43,28 @@ db.exec(`
     enabled INTEGER NOT NULL DEFAULT 1,
     profile_url TEXT NOT NULL DEFAULT ''
   );
+
+  CREATE TABLE IF NOT EXISTS app_meta (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
 `);
+
+// Set once, on the very first run, and never moved afterward — the
+// schedule calendar anchors here so past days stay visible even after
+// videos get unqueued/rescheduled and no longer reference that date.
+const calendarStart = db
+  .prepare(`SELECT value FROM app_meta WHERE key = 'calendar_start_date'`)
+  .get() as { value: string } | undefined;
+if (!calendarStart) {
+  const today = new Date();
+  const y = today.getFullYear();
+  const m = String(today.getMonth() + 1).padStart(2, "0");
+  const d = String(today.getDate()).padStart(2, "0");
+  db.prepare(`INSERT INTO app_meta (key, value) VALUES ('calendar_start_date', ?)`).run(
+    `${y}-${m}-${d}`
+  );
+}
 
 const networkCount = (
   db.prepare(`SELECT COUNT(*) as n FROM network_settings`).get() as { n: number }

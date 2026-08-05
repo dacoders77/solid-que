@@ -104,8 +104,11 @@ function slotCard(video) {
   el.innerHTML = `
     <video src="${video.video_url}" muted preload="metadata"></video>
     <div class="slot-card-body">
-      <div class="slot-card-id">#${video.id} ${metricoolBadge}</div>
-      <div class="slot-card-title">${escapeHtml(video.title)}</div>
+      <div class="slot-card-id">
+        #${video.id} ${metricoolBadge}
+        <span class="slot-status-badge">${escapeHtml(video.display_status)}</span>
+      </div>
+      <a class="slot-card-title" href="/video/${video.id}">${escapeHtml(video.title)}</a>
       <div class="slot-card-actions">
         <button data-action="unqueue">Return to Approve Queue</button>
       </div>
@@ -117,15 +120,12 @@ function slotCard(video) {
   });
   el.querySelector('[data-action="unqueue"]').addEventListener("click", async (e) => {
     e.stopPropagation();
-    const result = await api(`/api/videos/${video.id}/return-to-review`, { method: "POST" });
-    if (result.needs_metricool_cleanup) {
-      showToast(
-        `"${video.title}" was already on the Metricool calendar. Unscheduled here — remove/cancel it in Metricool manually too, this app can't auto-cancel a Metricool post yet.`,
-        "error",
-        true
-      );
+    try {
+      await api(`/api/videos/${video.id}/return-to-review`, { method: "POST" });
+      loadAll();
+    } catch (err) {
+      showToast(err.message, "error", true);
     }
-    loadAll();
   });
   return el;
 }
@@ -152,16 +152,32 @@ function scheduleCell(datetime) {
   return td;
 }
 
+function todayDateKey() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 async function renderSchedule() {
   const container = document.getElementById("scheduleTable");
   const grid = await api("/api/schedule?days=14");
+  const todayKey = todayDateKey();
 
   const table = document.createElement("table");
   table.className = "schedule-table";
 
   const thead = document.createElement("thead");
   const headRow = document.createElement("tr");
-  headRow.innerHTML = "<th></th>" + grid.map((day) => `<th>${formatDateHeader(day.date)}</th>`).join("");
+  headRow.innerHTML =
+    "<th></th>" +
+    grid
+      .map(
+        (day) =>
+          `<th class="${day.date === todayKey ? "today-col" : ""}" data-date="${day.date}">${formatDateHeader(day.date)}</th>`
+      )
+      .join("");
   thead.appendChild(headRow);
   table.appendChild(thead);
 
@@ -194,6 +210,11 @@ async function renderSchedule() {
 
   container.innerHTML = "";
   container.appendChild(table);
+
+  const todayHeader = table.querySelector(`th[data-date="${todayKey}"]`);
+  if (todayHeader) {
+    todayHeader.scrollIntoView({ inline: "start", block: "nearest" });
+  }
 }
 
 async function loadAll() {

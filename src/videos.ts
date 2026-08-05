@@ -6,6 +6,7 @@ export type VideoRowWithUrls = VideoRow & {
   thumbnail_url: string;
   public_video_url: string;
   public_thumbnail_url: string;
+  display_status: string;
 };
 
 // Files live wherever the render pipeline put them (never moved by this
@@ -15,6 +16,10 @@ export type VideoRowWithUrls = VideoRow & {
 // URLs (via the configured tunnel) with a signed token, for external
 // fetchers like Metricool that have no session — empty if no public base
 // URL is configured yet.
+//
+// display_status: the DB status stays 'queued' even after a video is added
+// to Metricool (it's still sitting in the schedule), but the UI should call
+// that "published" rather than "queued" once it's actually on the calendar.
 export function serialize(row: VideoRow): VideoRowWithUrls {
   return {
     ...row,
@@ -22,6 +27,8 @@ export function serialize(row: VideoRow): VideoRowWithUrls {
     thumbnail_url: row.thumbnail_path ? `/api/videos/${row.id}/thumbnail` : "",
     public_video_url: publicMediaUrl(row.id, "file"),
     public_thumbnail_url: row.thumbnail_path ? publicMediaUrl(row.id, "thumbnail") : "",
+    display_status:
+      row.status === "queued" && row.metricool_added_at ? "published" : row.status,
   };
 }
 

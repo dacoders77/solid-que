@@ -149,6 +149,11 @@ section h2 {
   top: 0;
 }
 
+.schedule-table th.today-col {
+  color: var(--accent);
+  border-bottom: 2px solid var(--accent);
+}
+
 .slot-label {
   font-size: 11px;
   color: var(--muted);
@@ -185,9 +190,25 @@ section h2 {
 }
 
 .slot-card-body { padding: 6px; font-size: 11px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
-.slot-card-id { color: var(--muted); font-family: monospace; }
+.slot-card-id { color: var(--muted); font-family: monospace; display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
 .metricool-badge { font-family: initial; cursor: help; }
-.slot-card-title { font-weight: 600; line-height: 1.2; }
+.slot-status-badge {
+  font-family: initial;
+  font-size: 9px;
+  text-transform: uppercase;
+  padding: 1px 5px;
+  border-radius: 10px;
+  background: #321d1d;
+  color: var(--accent);
+}
+.slot-card-title {
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--text);
+  text-decoration: none;
+  cursor: pointer;
+}
+.slot-card-title:hover { text-decoration: underline; }
 .slot-card-actions { margin-top: auto; display: flex; gap: 4px; }
 .slot-card-actions button { padding: 2px 6px; font-size: 10px; }
 
@@ -268,3 +289,43 @@ section h2 {
   text-decoration: none;
 }
 .network-profile-link:hover { text-decoration: underline; }
+
+.video-detail { max-width: 900px; }
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 700px) {
+  .detail-grid { grid-template-columns: 1fr; }
+}
+
+.detail-media video {
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  object-fit: cover;
+  background: #000;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.detail-actions { margin-top: 8px; }
+
+.detail-info { display: flex; flex-direction: column; gap: 16px; }
+
+.detail-field { border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+
+.detail-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.detail-value { font-size: 14px; line-height: 1.5; }
+.detail-value a { color: var(--accent); }
+.detail-muted { color: var(--muted); font-size: 13px; }
+.detail-path { font-family: monospace; font-size: 12px; color: var(--muted); word-break: break-all; }
