@@ -8,3 +8,4 @@ storage/
 dev-credentials.txt
 server.log
 *.log
+bin/

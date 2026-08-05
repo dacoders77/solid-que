@@ -17,6 +17,10 @@ export const config = {
   // Claude publish worker) that aren't browser sessions.
   serviceToken: process.env.SERVICE_TOKEN ?? "",
   dbPath: path.resolve(process.env.DB_PATH ?? "./data/solid-que.db"),
+  // Public base URL (e.g. a Cloudflare quick tunnel), used to build media
+  // URLs external services like Metricool can actually fetch. Empty means
+  // no public URL is configured yet.
+  publicBaseUrl: (process.env.PUBLIC_BASE_URL ?? "").replace(/\/$/, ""),
 };
 
 // Default Metricool posting slots per day, in local server time.

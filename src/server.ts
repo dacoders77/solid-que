@@ -8,6 +8,7 @@ import { authRouter } from "./routes/auth";
 import { ingestRouter } from "./routes/ingest";
 import { videosRouter } from "./routes/videos";
 import { publishRouter } from "./routes/publish";
+import { mediaRouter } from "./routes/media";
 import { db } from "./db";
 
 const app = express();
@@ -28,6 +29,7 @@ app.use(authRouter);
 // check, so they're mounted before the browser session gate below.
 app.use(ingestRouter);
 app.use(publishRouter);
+app.use(mediaRouter);
 
 // Static assets (JS/CSS) carry no sensitive data and must load even when
 // the session has gone stale, otherwise a login-redirected <script src>

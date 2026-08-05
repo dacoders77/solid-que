@@ -63,26 +63,6 @@ videosRouter.get("/api/videos/:id", (req, res) => {
   res.json(serialize(video));
 });
 
-// Streams the video/thumbnail by id, wherever the file actually lives.
-// res.sendFile supports Range requests natively, so <video> seeking works.
-videosRouter.get("/api/videos/:id/file", (req, res) => {
-  const video = getById(Number(req.params.id));
-  if (!video || !fs.existsSync(video.video_path)) {
-    res.status(404).end();
-    return;
-  }
-  res.sendFile(video.video_path);
-});
-
-videosRouter.get("/api/videos/:id/thumbnail", (req, res) => {
-  const video = getById(Number(req.params.id));
-  if (!video || !video.thumbnail_path || !fs.existsSync(video.thumbnail_path)) {
-    res.status(404).end();
-    return;
-  }
-  res.sendFile(video.thumbnail_path);
-});
-
 // Opens the video's source folder in Windows Explorer, on the machine
 // running this server. Only meaningful when the dashboard is used from the
 // same PC as the server (not over the port-forwarded remote connection).
